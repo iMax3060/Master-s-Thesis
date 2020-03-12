@@ -1,0 +1,79 @@
+\chapter[Buffer Pool Page Eviction Manager]{Buffer Pool Page Eviction Manager} \label{ch:page_evictioners}
+
+\section{Introduction} \label{sec:page_evictioners_intro}
+
+\section{Page Eviction Strategies} \label{sec:page_eviction_strategies}
+
+\subsection[RANDOM]{RANDOM Replacement} \label{subsec:random}
+
+\subsubsection[LOOP]{LOOP Replacement} \label{subsubsec:loop}
+
+\subsection[FIFO]{First In, First Out (FIFO)} \label{subsec:fifo}
+
+\subsection[FILO]{First In, Last Out (FILO)} \label{subsec:filo}
+
+\subsection[LRU]{Least Recently Used (LRU)} \label{subsec:lru}
+
+\subsubsection{Hash-Map-Linked-List Implementation} \label{subsubsec:lru_traditional}
+
+\subsubsection{Timestamp-Sorting Implementation} \label{subsubsec:lru_timestamp}
+
+\subsection[MRU]{Most Recently Used (MRU)} \label{subsec:mru}
+
+\subsection[LRU-K]{LRU-K} \label{subsec:lru-k}
+
+\subsubsection{Hash-Map-Linked-List Implementation} \label{subsubsec:lru-k_traditional}
+
+\subsubsection{Timestamp-Sorting Implementation} \label{subsubsec:lru-k_timestamp}
+
+\subsection[SLRU]{Segmented LRU (SLRU)} \label{subsec:slru}
+
+\subsection[CLOCK]{CLOCK} \label{subsec:clock}
+
+\subsection[GCLOCK]{Generalized CLOCK (GCLOCK)} \label{subsec:gclock}
+
+\subsubsection[GCLOCK-V1]{GCLOCK-V1} \label{subsubsec:gclock-v1}
+
+\subsubsection[GCLOCK-V2]{GCLOCK-V2} \label{subsubsec:gclock-v2}
+
+\subsection[DGCLOCK]{Dynamic Generalized CLOCK (DGCLOCK)} \label{subsec:dgclock}
+
+\subsubsection[DGCLOCK-V1]{DGCLOCK-V1} \label{subsubsec:dgclock-v1}
+
+\subsubsection[DGCLOCK-V2]{DGCLOCK-V2} \label{subsubsec:dgclock-v2}
+
+\subsection[LRD]{Least Reference Density (LRD)} \label{subsec:lrd}
+
+\subsubsection[LRD-V1]{LRD-V1} \label{subsubsec:lrd-v1}
+
+\subsubsection[LRD-V2]{LRD-V2} \label{subsubsec:lrd-v2}
+
+\subsection[LFU]{Least Frequently Used (LFU)} \label{subsec:lfu}
+
+\subsection[LFUDA]{LFU With Dynamic Aging (LFUDA)} \label{subsec:lfuda}
+
+\subsection[MQ]{Multi Queue (MQ)} \label{subsec:mq}
+
+\subsection[ARC]{Adaptive Replacement Cache (ARC)} \label{subsec:arc}
+
+\subsection[CAR]{Clock With Adaptive Replacement (CAR)} \label{subsec:car}
+
+\subsubsection[CART]{CAR With Temporal Filtering (CART)} \label{subsubsec:cart}
+
+\subsection[LIRS]{Low Inter-Reference Recency Set (LIRS)} \label{subsec:lirs}
+
+\subsection{CLOCK-Pro} \label{subsec:clock-pro}
+
+\subsection[LeanStore]{LeanStore Replacement} \label{subsec:leanstore}
+
+\section[Performance Evaluation]{Performance Evaluation} \label{sec:page_evictioners_performance_evaluation}
+
+\subsection[System Configuration]{System Configuration} \label{subsec:page_evictioners_system_configuration}
+
+\subsection[Benchmark]{Benchmark} \label{subsec:page_evictioners_benchmark}
+
+\subsection[Results]{Results} \label{subsec:page_evictioners_results}
+
+\subsection[Analysis]{Analysis} \label{subsec:page_evictioners_analysis}
+
+\section{Conclusion} \label{sec:page_evictioners_outro}
