@@ -106,7 +106,7 @@
 \floatstyle{komaabove}                        % every definition of a new type of floats will use this style (defined by KOMA-Script: komaabove, komabelow)
 \newfloat{code}{tbp}{code}[chapter]           % defines a new type of float ``code'' that gets numbered per chapter and that can be used with \begin{code} ... \end{code} and \listof{code}{List of Listings}
 \floatname{code}{Listing}                     % the name of the float ``code'' that is printed in the caption is ``Listing''
-\newfloat{algorithm}{tbp}{algorithm}[chapter] % defines a new type of float ``algorithm'' that gets numbered per chapter and that can be used with \begin{code} ... \end{code} and \listof{code}{List of Listings}
+\newfloat{algorithm}{tbp}{algorithm}[chapter] % defines a new type of float ``algorithm'' that gets numbered per chapter and that can be used with \begin{algorithm} ... \end{algorithm} and \listof{algorithm}{List of Algorithms}
 \floatname{algorithm}{Algorithm}              % the name of the float ``algorithm'' that is printed in the caption is ``Algorithm''
 \usepackage{caption}                          % used to split floats using \ContinuedFloat but has many more features
 
@@ -299,10 +299,11 @@
     \include{./tex/abstract}
 
     \cleardoublepage
-    \tableofcontents                   % generates a table of contents
-    % \listoffigures                   % generates a list of all figures (use of the figure environment (or environment using the figure environment) with a \label)
-    % \listoftables                    % generates a list of all tables (use of the ? environment with a ?)
-    % \listof{code}{List of Listings}  % generates a list of all listings as defined using the float package
+    \tableofcontents                         % generates a table of contents
+    % \listoffigures                         % generates a list of all figures (use of the figure environment (or environment using the figure environment) with a \label)
+    % \listoftables                          % generates a list of all tables (use of the ? environment with a ?)
+    %\listof{algorithm}{List of Algorithms}  % generates a list of all algorithms as defined using the float package
+    % \listof{code}{List of Listings}        % generates a list of all listings as defined using the float package
 
     \cleardoublepage
     \pagenumbering{arabic}
