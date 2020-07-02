@@ -1,79 +1,606 @@
-\chapter[Buffer Pool Page Eviction Manager]{Buffer Pool Page Eviction Manager} \label{ch:page_evictioners}
+\chapter[Buffer Manager Page Eviction]{Page Eviction by the Buffer Management} \label{ch:page_evictioners}
 
-\section{Introduction} \label{sec:page_evictioners_intro}
+\section{DBMS Buffer Management} \label{sec:page_evictioners_purpose}
 
-\section{Page Eviction Strategies} \label{sec:page_eviction_strategies}
+    The buffer management of a typical disk-based DBMS serves the purpose of providing the higher layers of the DBMS with managed access to data and metadata pages of a database stored in files on the secondary storage. This managed access involves fetching specific pages into specific memory locations---so-called \emph{buffer frames}---inside the buffer pool and write-back changes to pages in memory to database files in secondary storage.
 
-\subsection[RANDOM]{RANDOM Replacement} \label{subsec:random}
+    Today, there are server systems with \SI{48}{\tebi\byte} of cache-coherent shared memory\footnote{\url{https://bit.ly/37ZfGMH}} that allow \emph{in-memory} management of almost any database of any application. But such expensive systems (\SI{>2000000}{\euro}) do not pay off for most applications with large databases. Therefore, there will still be many situations in which the main memory of a system is significantly smaller than the database(s) managed on it. Accordingly, the number of buffer frames in the buffer pool is then smaller than the number of pages in the database.
 
-\subsubsection[LOOP]{LOOP Replacement} \label{subsubsec:loop}
+    Therefore, the buffer management must \emph{evict} pages from buffer frames if currently not buffered pages are referenced while there are no more free buffer frames. For this purpose, each buffer manager has a page eviction module---implementing one of the many \emph{page replacement algorithms} developed since the 1960s.
+
+    In \emph{OLTP} applications, the majority of database accesses are random accesses, so the access latency of the underlying storage technology (Figure \ref{fig:storagehierarchy}) is critical to performance. The main goal of buffer management is to maximize the \emph{hit rate} in the DB buffer by keeping as many pages of the working set (pages referenced in the near future) as possible in relatively fast (\SI{51}{\nano\second}) main memory to avoid expensive (\SI{>100}{\micro\second}) secondary storage accesses.
+
+\begin{@empty}
+    \tikzset{%
+        changes/.style = { -> , very thick, > = stealth}
+    }
+    
+    \nottoggle{bwmode}{
+        \tikzset{%
+            volatile/.style = {fill = red!50},
+            nonvolatile/.style = {fill = green!50},
+            changes/.append style = {color = red}
+        }
+    }{
+        \tikzset{%
+            volatile/.style = {pattern = crosshatch, pattern color = black!25},
+            nonvolatile/.style = {pattern = crosshatch dots, pattern color = black!25}
+        }
+    }
+    
+    \begin{figure}[ht!]
+        \centering
+        \begin{minipage}{\linewidth}
+            \resizebox{\textwidth}{!}{
+                \begin{tikzpicture}
+                % Center points of the baseline of each pyramid layer (0: Peak of the pyramid; 1: Center of the baseline of the top layer; ...)
+                \node[]  (0)                                                                       {};
+                \node[]  (1)   [below = 1.5cm of 0.center, anchor = center]                        {};
+                \node[]  (2a)  [below = (1/3)*1.25cm of 1.center, anchor = center]                 {};
+                \node[]  (2b)  [below = (1/3)*1.25cm of 2a.center, anchor = center]                {};
+                \node[]  (2c)  [below = (1/3)*1.25cm of 2b.center, anchor = center]                {};
+                \node[]  (3)   [below = 0.75cm of 2c.center, anchor = center]                      {};
+                \node[]  (4)   [below = 0.75cm of 3.center, anchor = center]                       {};
+                \node[]  (5)   [below = 0.75cm of 4.center, anchor = center]                       {};
+                \node[]  (6)   [below = 0.75cm of 5.center, anchor = center]                       {};
+                
+                % Anchor points of the pyramid (n0: Left anchor point; n1: Right anchor point):
+                \node[]  (10)  [left = (2/3)*1.5cm of 1.center, anchor = center]                   {};
+                \node[]  (11)  [right = (2/3)*1.5cm of 1.center, anchor = center]                  {};
+                \node[]  (2a0) [left = (2/3)*(1.5cm+(1/3)*1.25cm) of 2a.center, anchor = center]   {};
+                \node[]  (2a1) [right = (2/3)*(1.5cm+(1/3)*1.25cm) of 2a.center, anchor = center]  {};
+                \node[]  (2b0) [left = (2/3)*(1.5cm+(2/3)*1.25cm) of 2b.center, anchor = center]   {};
+                \node[]  (2b1) [right = (2/3)*(1.5cm+(2/3)*1.25cm) of 2b.center, anchor = center]  {};
+                \node[]  (2c0) [left = (2/3)*(1.5cm+(3/3)*1.25cm) of 2c.center, anchor = center]   {};
+                \node[]  (2c1) [right = (2/3)*(1.5cm+(3/3)*1.25cm) of 2c.center, anchor = center]  {};
+                \node[]  (30)  [left = (2/3)*3.5cm of 3.center, anchor = center]                   {};
+                \node[]  (31)  [right = (2/3)*3.5cm of 3.center, anchor = center]                  {};
+                \node[]  (40)  [left = (2/3)*4.25cm of 4.center, anchor = center]                  {};
+                \node[]  (41)  [right = (2/3)*4.25cm of 4.center, anchor = center]                 {};
+                \node[]  (50)  [left = (2/3)*5cm of 5.center, anchor = center]                     {};
+                \node[]  (51)  [right = (2/3)*5cm of 5.center, anchor = center]                    {};
+                \node[]  (60)  [left = (2/3)*5.75cm of 6.center, anchor = center]                  {};
+                \node[]  (61)  [right = (2/3)*5.75cm of 6.center, anchor = center]                 {};
+                
+                % "Center" of the pyramid (shifted towards top) used for the designation of performance measures:
+                \node[]  (cen) [below = 2.5cm of 0.center]                                         {};
+                
+                % Designation of performance measures:
+                \node[rotate = 55]  (cpu) [left = 3.5cm of cen.center, anchor = center]  {\footnotesize \textit{\textbf{Capacity per CPU}}};
+                \node[rotate = -55] (acc) [right = 4.5cm of cen.center, anchor = center] {\footnotesize \textit{\textbf{Access Time}}};
+                
+                % Fills the pyramid to mark volatile and non-volatile layers:
+                \fill[volatile]    (0.center) -- (30.center) -- (31.center) -- cycle;
+                \fill[nonvolatile] (30.center) -- (31.center) -- (61.center) -- (60.center) -- cycle;
+                
+                % Key the markings for volatile and non-volatile layers
+                \node[draw, volatile]    (red)      [left = 4cm of 0.center, anchor = north]      {};
+                \node[]                  (legred)   [right = 0cm of red.east, anchor = west]      {\footnotesize Volatile};
+                \node[draw, nonvolatile] (green)    [below = 0.2cm of red.south, anchor = north]  {};
+                \node[]                  (leggreen) [right = 0cm of green.east, anchor = west]    {\footnotesize Non-volatile};
+                
+                % Storage layer names:
+                \node[] (reg) [above = 0cm of 1.center, anchor = south]     {\footnotesize Registers};
+                \node[] (l1)  [above = 0cm of 2a.center, anchor = south]    {\footnotesize L1 Cache};
+                \node[] (l2)  [above = 0cm of 2b.center, anchor = south]    {\footnotesize L2 Cache};
+                \node[] (l3)  [above = 0cm of 2c.center, anchor = south]    {\footnotesize L3 Cache};
+                \node[] (mem) [above = 0.05cm of 3.center, anchor = south]  {\small Main Memory};
+                \node[] (ssd) [above = 0.05cm of 4.center, anchor = south]  {\small Online Storage \scriptsize \textit{(Secondary S.) - SDD}};
+                \node[] (mas) [above = 0.05cm of 5.center, anchor = south]  {\small Online Storage \scriptsize \textit{(Secondary S.) - HDD}};
+                \node[] (mem) [above = 0.05cm of 6.center, anchor = south]  {\small Offline Storage \scriptsize \textit{(Tertiary Storage)}};
+                
+                % Anchor points for the brace used to mark the example data from Intel Xeon:
+                \node[] (0h)        [right = 2.75cm of 0]     {};
+                \node[] (31h)       [right = 2.75cm of 31]    {};
+                
+                % Draw the pyramid:
+                \path[ - , thick]
+                (0.center)         edge        (10.center)
+                (0.center)         edge        (11.center)
+                (10.center)        edge        (11.center)
+                (10.center)        edge        (2a0.center)
+                (11.center)        edge        (2a1.center)
+                (2a0.center)       edge        (2a1.center)
+                (2a0.center)       edge        (2b0.center)
+                (2a1.center)       edge        (2b1.center)
+                (2b0.center)       edge        (2b1.center)
+                (2b0.center)       edge        (2c0.center)
+                (2b1.center)       edge        (2c1.center)
+                (2c0.center)       edge        (2c1.center)
+                (2c0.center)       edge        (30.center)
+                (2c1.center)       edge        (31.center)
+                (30.center)        edge        (31.center)
+                (30.center)        edge        (40.center)
+                (31.center)        edge        (41.center)
+                (40.center)        edge        (41.center)
+                (40.center)        edge        (50.center)
+                (41.center)        edge        (51.center)
+                (50.center)        edge        (51.center)
+                (50.center)        edge        (60.center)
+                (51.center)        edge        (61.center)
+                (60.center)        edge        (61.center);
+                
+                % Draw the connections between the brace used to mark the example data from Intel Xeon and the appropriate pyramid layers:
+                \path[dotted]
+                (0.center)             edge        (0h.center)
+                (31.center)            edge        (31h.center);
+                
+                % Add the capacities:
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (0.center) -- (10.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\SI{128}{\byte}\protect\footnote{Only considered general purpose registers.}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (10.center) -- (2a0.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\small \SI{256}{\kibi\byte}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (2a0.center) -- (2b0.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\small \SI{1}{\mebi\byte}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (2b0.center) -- (2c0.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\small \SI{8}{\mebi\byte}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (2c0.center) -- (30.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\SI{\leq1.5}{\tebi\byte}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (30.center) -- (40.center) node[black, midway, xshift = 0.3cm, yshift = 0.1cm, anchor = east] {\begin{tabular}{l}many\\\si{\tebi\byte}\end{tabular}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (40.center) -- (50.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\si{\tebi\byte}--\si{\pebi\byte}};
+                \draw [decorate, decoration = {brace, mirror, amplitude = 3.75pt}]
+                (50.center) -- (60.center) node[black, midway, xshift = -0.1cm, yshift = 0.1cm, anchor = east] {\si{\pebi\byte}};
+                
+                % Add the access times:
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (0.center) -- (11.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\SI{1}{\cy} $\approx$ \SI{0.25}{\nano\second}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (11.center) -- (2a1.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\small \SI{4}{\cy} $\approx$ \SI{1}{\nano\second}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (2a1.center) -- (2b1.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\small \SI{12}{\cy} $\approx$ \SI{3}{\nano\second}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (2b1.center) -- (2c1.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\small \SI{42}{\cy} $\approx$ \SI{11}{\nano\second}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (2c1.center) -- (31.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\SI{51}{\nano\second}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (31.center) -- (41.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\SI{\approx 0.1}{\milli\second} \tiny \footnote{\url{https://bit.ly/2BaG1v9}}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (41.center) -- (51.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {\numrange{5}{20}\si{\milli\second} \tiny \footnote{\url{https://bit.ly/2YxdvN1}} \footnote{\url{https://bit.ly/2NxvMnj}}};
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (51.center) -- (61.center) node[black, midway, xshift = 0.1cm, yshift = 0.1cm, anchor = west] {$s - min$};
+                
+                % Mark the source of the performance data of the volatile layers:
+                \draw [decorate, decoration = {brace, amplitude = 3.75pt}]
+                (0h.center) -- (31h.center) node[black, midway, xshift = -0.625cm, yshift = 0.1cm, anchor = west] {\footnotesize \begin{tabular}{r}\textit{\textbf{Example System:}}\\\textit{Intel\textsuperscript{\tiny\textregistered} Xeon\textsuperscript{\tiny\textregistered}}\\\textit{E3-1280 v5}\\\textit{(Skylake)}\footnote{\url{https://bit.ly/3dDBZbH}}\end{tabular}};
+                
+                % Orientation of changes of performance data:
+                \path[changes]
+                ([xshift = (-1/3)*4cm+0.25cm]60.center) edge node[above, rotate = 90]  {\footnotesize Price per Capacity} ([xshift = (-1/3)*14cm-0.25cm]0.center)
+                ([xshift = (1/3)*18cm+0.5cm]0.center)   edge node[above, rotate = -90] {\footnotesize Access Time}        ([xshift = (1/3)*8cm]61.center);
+                \end{tikzpicture}
+            }
+        \end{minipage}
+        \caption[Storage Hierarchy of Computer Systems]{Storage hierarchy of computer systems}
+        \label{fig:storagehierarchy}
+        \protect
+    \end{figure}
+\end{@empty}
+
+    Bélády's optimal page replacement algorithm \cite{Belady:1966} evicts the one\linebreak page from the buffer pool that is not re-referenced for the longest time in the future. However, this algorithm cannot make this decision at runtime, since this would require knowledge about future requests to the database. Therefore, page replacement algorithms that can be implemented in DBMS must use heuristics to approximate the eviction decisions of Bélády's algorithm to achieve a high hit rate. These heuristics are usually based on the assumption that there is a temporal locality of the page references. The management of data in B-tree indices, which were developed 50 years ago to improve the spatial locality of references in order to reduce random disk access in database applications \cite{Bayer:1970}, increases the temporal locality of page references due to the hierarchical structure of B-trees in which higher-level pages are more likely to be referenced.
+
+    The expected performance of these possible page replacement algorithms relative to the buffer pool size is shown in Figure \ref{fig:missratebufferpoolsize}. In this diagram, $MR_{CS}$ is the minimum miss rate, which is greater than $0$ due to the page misses that occur when each page is first referenced after a cold start. The maximum miss rate $MR_{\text{max}}$ is less than $1$ due to the fact that there are always some random page hits, even with RANDOM eviction on workloads with no locality of references. $D$ is the database size and $B_{\text{min}}$ is the minimum buffer pool size that will still lead to a working system.
+
+\begin{@empty}%
+    \nottoggle{bwmode}{
+        \tikzset{%
+            plot/.style       = {smooth, mark = \empty},
+            optimal/.style    = {very thick, color = green},
+            best/.style       = {            color = blue},
+            random/.style     = {very thick, color = red},
+            noLocality/.style = {very thick, color = purple},
+            possible/.style   = {pattern = north east lines, pattern color = blue!75}
+        }
+    }{
+        \tikzset{%
+            plot/.style       = {smooth, mark = \empty},
+            optimal/.style    = {very thick},
+            best/.style       = {            color = black!75},
+            random/.style     = {very thick, dashed},
+            noLocality/.style = {very thick, dotted},
+            possible/.style   = {pattern = north east lines, pattern color = black!75}
+
+        }
+    }    
+
+    \begin{figure}[ht!]
+        \resizebox{\textwidth}{.5\textwidth}{
+            \begin{tikzpicture}
+                \begin{axis}[xlabel = Buffer pool size $B$,
+                             xmin = 0,
+                             xmax = 105,
+                             xtick = {5, 100},
+                             xticklabels = {$B_{min}$, $D$},
+                             ylabel = Miss rate $MR$,
+                             ymin = 0,
+                             ymax = 105,
+                             ytick = {5, 95, 100},
+                             yticklabels = {$MR_{CS}$, $MR_{max}$, $1$},
+                             legend pos = north east,
+                             area legend,
+                             axis x line = bottom,
+                             axis y line = left,
+                             width = \textwidth,
+                             height = {.5\textwidth}]
+                    \addplot+[plot, optimal, name path = optimal, line legend] coordinates {
+                        (5, 95)
+                        (20, 25)
+                        (50, 7.5)
+                        (100, 5)
+                    };
+                    \addplot+[plot, best, name path = best, empty legend] coordinates {
+                        (5, 95)
+                        (20, 45)
+                        (30, 27.5)
+                        (50, 15)
+                        (100, 5)
+                    };
+                    \addplot+[plot, random, name path = random, line legend] coordinates {
+                        (5, 95)
+                        (20, 60)
+                        (35, 34)
+                        (50, 22.5)
+                        (100, 5)
+                    };
+                    \addplot+[plot, noLocality, name path = noLocality, line legend] coordinates {
+                        (5, 95)
+                        (100, 5)
+                    };
+                    \addplot[possible] fill between [of = best and random];
+    
+                    \legend{optimal, , random, no locality, possible}
+                \end{axis}
+            \end{tikzpicture}
+        }
+        \caption[Connection Between Miss Rate and Buffer Pool Size]{Connection between miss rate and buffer pool size \cite{Effelsberg:1984}}
+        \label{fig:missratebufferpoolsize}
+    \end{figure}
+\end{@empty}
+
+    Besides the impossibility to implement Bélády's optimal page replacement algorithm, there are also technical limitations in the use of the possible page replacement algorithms. The abstract algorithms can evict any page from the buffer pool at any time. However, in a real-world system, there are many reasons why a page that has been selected for eviction by the page replacement algorithm cannot be immediately evicted. One reason, for example, is already visible in the typical interface of a buffer pool---a page can be fixed and unfixed by the higher layers of the DBMS. Between fixing and unfixing a page, it is guaranteed that it remains in the same buffer frame, since the fixing thread processes the page during this time. Another problem for some page replacement algorithms is the possibility to explicitly evict pages from the buffer pool---independent from the decisions of the page replacement algorithm.
+
+    The test system used for this work knows the following reasons why a page in the buffer pool is either temporarily or permanently unreclaimable:
+    \begin{itemize}
+        \item Metadata pages can never be evicted.
+        \item B-tree root pages can never be evicted.
+        \item Inner B-tree pages can never be evicted when pointer swizzling (like in \cite{Graefe:2014}) is used in the buffer pool.
+        \item B-tree pages with foster children (the Foster B-Tree from \cite{Graefe:2012} is used) cannot be evicted.
+        \item Dirty pages cannot be evicted until they are written back.
+        \item Pages pinned to the buffer pool by higher layers of the DBMS cannot be evicted.
+    \end{itemize}
+    
+    All non-trivial page replacement algorithms collect statistics about page references to base their eviction decisions on. Simple implementations of these page replacement algorithms do not reflect in their statistics the fact that certain pages are temporarily or permanently unreclaimable. But treating pages found temporarily unreclaimable as a page reference and excluding pages that are permanently unreclaimable from the eviction could improve future eviction decisions or the runtime of the algorithm.
+
+\section{Page Replacement Strategies} \label{sec:page_replacement_strategies}
+
+    There are two traditional classifications for page replacement algorithms---Bélády's classification from \cite{Belady:1966} and the classification by Effelsberg and Härder from \cite{Effelsberg:1984}.
+
+    Bélády grouped the replacement algorithms into the three classes described in Table \ref{tab:bclassification}. \ref{intab:beladyclass3}
+
+\begin{@empty}%
+    \begin{table}[]
+        \begin{labeleddescription}
+            \item[Class 1] \label{intab:beladyclass1}  Replacement algorithms of this class do not use statistics for their eviction decisions.
+            \item[Class 2] \label{intab:beladyclass2}  Replacement algorithms of this class keep statistics about the latest references of \emph{pages in the buffer pool} and use them for their eviction decisions.
+            \item[Class 3] \label{intab:beladyclass3}  Replacement algorithms of this class keep statistics about each time \emph{any page} was fetched from the database and each time it was evicted from the buffer pool and use these statistics for their eviction decisions.
+        \end{labeleddescription}
+        \caption[Bélády's Classification]{Bélády's classification of page replacement algorithms from \cite{Belady:1966}}
+        \label{tab:bclassification}
+    \end{table}
+\end{@empty}
+
+    The classification by Effelsberg and Härder is two-dimensional as it takes into account if a page replacement algorithm considers the time since a certain reference of a page happened---the age---and the number of references of a page---the references. 
+
+    The following discussion of various page eviction algorithms is not organized according to any of the two classifications 
+
+\begin{@empty}%
+    \renewcommand{\baselinestretch}{.6}
+    \setcellgapes{2pt}
+    \makegapedcells
+    \begin{table}[]
+        \footnotesize
+        \begin{tabular}{|c|c|c|c|c|c|}
+            \hline
+            \multicolumn{2}{|c|}{%
+                \multirow{2}{*}{%
+                    \textbf{%
+                        \makecell[c]{%
+                            Consideration\\%
+                            during selection\\%
+                            decision%
+                        }%
+                    }%
+                }%
+            }                                   &
+            \multicolumn{4}{c|}{%
+                \textbf{Age}%
+            }                                                       \\ \cline{3-6}
+%
+            \multicolumn{2}{|c|}{}              &
+            \makecell[c]{%
+                No\\%
+                consideration%
+            }                                   &
+            \makecell[c]{%
+                Since most\\%
+                recent reference%
+            }                                   &
+            \makecell[c]{%
+                Since some\\%
+                recent reference%
+            }                                   &
+            \makecell[c]{%
+                Since first\\%
+                reference%
+            }                                                       \\ \hline
+%
+            \multirow{4}{*}{%
+                \rotcell[c]{%
+                    \textbf{References}%
+                }%
+            }                                   &
+            \makecell[c]{%
+                No\\%
+                consideration%
+            }                                   &
+            \makecell[c]{%
+                \hyperref[subsec:random]{RANDOM}\\%
+                \hyperref[subsubsec:loop]{LOOP}%
+            }                                   &
+                                                &
+                                                &
+            \makecell[c]{%
+                \hyperref[subsec:fifo]{FIFO}\\%
+                \hyperref[subsec:filo]{FILO}%
+            }                                                       \\ \cline{2-6}
+                                                &
+            \makecell[c]{%
+                Most recent\\%
+                reference%
+            }                                   &
+            \hyperref[subsec:zclock]{ZCLOCK}    &
+            \makecell[c]{%
+                \hyperref[subsec:lru]{LRU}\\%
+                \hyperref[subsec:mru]{MRU}\\%
+                \hyperref[subsec:clock]{CLOCK}\\%
+                \hyperref[subsubsec:gclock-v2]{GCLOCK-V2}\\%
+                \hyperref[subsubsec:dgclock-v2]{DGCLOCK-V2}\\%
+                \hyperref[subsec:leanstore]{LeanStore}%
+            }                                   &
+                                                &
+                                                                    \\ \cline{2-6}
+%
+                                                &
+            \makecell[c]{%
+                Some recent\\%
+                references%
+            }                                   &
+                                                &
+                                                &
+            \hyperref[subsec:lru-k]{LRU-K}      &
+                                                                    \\ \cline{2-6}
+%
+                                                &
+            \makecell[c]{%
+                All\\%
+                references%
+            }                                   &
+            \hyperref[subsec:lfu]{LFU}          &
+            \makecell[c]{%
+                \hyperref[subsubsec:gclock-v1]{GCLOCK-V1}\\%
+                \hyperref[subsubsec:dgclock-v1]{DGCLOCK-V1}%
+            }                                   &       
+                                                &
+                                                                    \\ \hline
+        \end{tabular}
+        \caption[Classification by Effelsberg and Härder]{Page replacement algorithm classification by Effelsberg and Härder from \cite{Effelsberg:1984}}
+        \label{tab:ehclassification}
+    \end{table}
+\end{@empty}
+
+\subsection{RANDOM} \label{subsec:random}
+
+    The RANDOM page replacement strategy is the simplest one as it does not maintain any statistics about past page references and
+
+\subsubsection{LOOP} \label{subsubsec:loop}
+
+    
 
 \subsection[FIFO]{First In, First Out (FIFO)} \label{subsec:fifo}
 
+    The FIFO page replacement strategy always evicts the oldest page first---it organizes the pages in a FIFO queue, which is normally implemented as a ring buffer. However, due to limitations caused by the fact that certain pages are temporarily or permanently unreclaimable, the replacement strategy must be modified for use in a DB buffer pool, and such a Quasi-FIFO cannot be implemented with a simple ring buffer, but needs more complex data structures for its page reference statistics and more complex control structures for finding replacement candidates.
+
+    The implementation evaluated here uses two queues, the \emph{FIFO queue} and the \emph{retry queue}. When a page is fetched into the buffer pool, it is placed in the \emph{FIFO queue}. It will be moved to the tail of the \emph{retry Queue} if it is found to be unreclaimable after being selected for eviction by the {\footnotesize \textbf{function} SELECT} from Algorithm \ref{alg:FIFOselect}.
+
+\begin{@empty}
+    \begin{algorithm}[ht!]
+        \caption{Selection of replacement candidates with Quasi-FIFO.}
+        \label{alg:FIFOselect}
+        \scriptsize
+        \begin{algorithmic}[1]
+            \Function{select}{}
+                \State $\text{selected} \gets 0$
+                \While{$\text{true}$}
+                    \If{$\text{currentlyCheckingRetryQueue} == \text{false}$}
+                        \If{$\text{currentQueueChecks} < \text{initialQueueChecks} \vee \left|retryQueue\right| == 0$}
+                            \State $\text{selected} \gets \text{initialQueue.pop()}$
+                            \State $\text{currentQueueChecks} \gets \text{currentQueueChecks} + 1$
+                            \If{$\text{notExplicitlyEvictedList}\left[\text{selected}\right] == \text{true}$}
+                                \Return $\text{selected}$
+                            \Else
+                                \State $\text{notExplicitlyEvictedList}\left[\text{selected}\right] \gets \text{true}$
+                                \State $\textbf{continue}$
+                            \EndIf
+                        \Else
+                            \State $\text{selected} \gets \text{retryQueue.pop()}$
+                            \If{$\text{notExplicitlyEvictedList}\left[\text{selected}\right] == \text{true}$}
+                                \State $\text{currentQueueChecks} \gets 0$
+                                \State $\text{currentlyCheckingRetryQueue} \gets \text{true}$
+                                \Return $\text{selected}$
+                            \Else
+                                \State $\text{notExplicitlyEvictedList}\left[\text{selected}\right] \gets \text{true}$
+                                \State $\textbf{continue}$
+                            \EndIf            
+                        \EndIf
+                    \Else
+                        \If{$\text{currentQueueChecks} < \text{retryQueueChecks} \vee \left|initialQueue\right| == 0$}
+                            \State $\text{selected} \gets \text{retryQueue.pop()}$
+                            \State $\text{currentQueueChecks} \gets \text{currentQueueChecks} + 1$
+                            \If{$\text{notExplicitlyEvictedList}\left[\text{selected}\right] == \text{true}$}
+                                \Return $\text{selected}$
+                            \Else
+                                \State $\text{notExplicitlyEvictedList}\left[\text{selected}\right] \gets \text{true}$
+                                \State $\textbf{continue}$
+                            \EndIf
+                        \Else
+                            \State $\text{selected} \gets \text{initialQueue.pop()}$
+                            \If{$\text{notExplicitlyEvictedList}\left[\text{selected}\right] == \text{true}$}
+                                \State $\text{currentQueueChecks} \gets 0$
+                                \State $\text{currentlyCheckingRetryQueue} \gets \text{false}$
+                                \Return $\text{selected}$
+                            \Else
+                                \State $\text{notExplicitlyEvictedList}\left[\text{selected}\right] \gets \text{true}$
+                                \State $\textbf{continue}$
+                            \EndIf            
+                        \EndIf
+                    \EndIf
+                \EndWhile
+            \EndFunction
+        \end{algorithmic}
+    \end{algorithm}
+\end{@empty}
+
 \subsection[FILO]{First In, Last Out (FILO)} \label{subsec:filo}
+
+    
 
 \subsection[LRU]{Least Recently Used (LRU)} \label{subsec:lru}
 
-\subsubsection{Hash-Map-Linked-List Implementation} \label{subsubsec:lru_traditional}
+    The LRU page eviction algorithm is probably the most traditional approach for 
 
-\subsubsection{Timestamp-Sorting Implementation} \label{subsubsec:lru_timestamp}
+\subsubsection[Hash-Map-Linked-List]{Hash-Map-Linked-List Implementation} \label{subsubsec:lru_traditional}
+
+    
+
+\subsubsection[Timestamp-Sorting]{Timestamp-Sorting Implementation} \label{subsubsec:lru_timestamp}
+
+    
 
 \subsection[MRU]{Most Recently Used (MRU)} \label{subsec:mru}
 
-\subsection[LRU-K]{LRU-K} \label{subsec:lru-k}
+    
 
-\subsubsection{Hash-Map-Linked-List Implementation} \label{subsubsec:lru-k_traditional}
+\subsection{LRU-K} \label{subsec:lru-k}
 
-\subsubsection{Timestamp-Sorting Implementation} \label{subsubsec:lru-k_timestamp}
+    
+
+\subsubsection[Hash-Map-Linked-List]{Hash-Map-Linked-List Implementation} \label{subsubsec:lru-k_traditional}
+
+    
+
+\subsubsection[Timestamp-Sorting]{Timestamp-Sorting Implementation} \label{subsubsec:lru-k_timestamp}
+
+    
 
 \subsection[SLRU]{Segmented LRU (SLRU)} \label{subsec:slru}
 
-\subsection[CLOCK]{CLOCK} \label{subsec:clock}
+    
+
+\subsection{CLOCK} \label{subsec:clock}
+
+    
+
+\subsection[ZCLOCK]{Zero-Handed CLOCK (ZCLOCK)} \label{subsec:zclock}
+
+    
 
 \subsection[GCLOCK]{Generalized CLOCK (GCLOCK)} \label{subsec:gclock}
 
-\subsubsection[GCLOCK-V1]{GCLOCK-V1} \label{subsubsec:gclock-v1}
+    
 
-\subsubsection[GCLOCK-V2]{GCLOCK-V2} \label{subsubsec:gclock-v2}
+\subsubsection{GCLOCK-V1} \label{subsubsec:gclock-v1}
+
+    
+
+\subsubsection{GCLOCK-V2} \label{subsubsec:gclock-v2}
+
+    
 
 \subsection[DGCLOCK]{Dynamic Generalized CLOCK (DGCLOCK)} \label{subsec:dgclock}
 
-\subsubsection[DGCLOCK-V1]{DGCLOCK-V1} \label{subsubsec:dgclock-v1}
+    
 
-\subsubsection[DGCLOCK-V2]{DGCLOCK-V2} \label{subsubsec:dgclock-v2}
+\subsubsection{DGCLOCK-V1} \label{subsubsec:dgclock-v1}
+
+    
+
+\subsubsection{DGCLOCK-V2} \label{subsubsec:dgclock-v2}
+
+    
 
 \subsection[LRD]{Least Reference Density (LRD)} \label{subsec:lrd}
 
-\subsubsection[LRD-V1]{LRD-V1} \label{subsubsec:lrd-v1}
+    
 
-\subsubsection[LRD-V2]{LRD-V2} \label{subsubsec:lrd-v2}
+\subsubsection{LRD-V1} \label{subsubsec:lrd-v1}
+
+    
+
+\subsubsection{LRD-V2} \label{subsubsec:lrd-v2}
+
+    
 
 \subsection[LFU]{Least Frequently Used (LFU)} \label{subsec:lfu}
 
+    
+
 \subsection[LFUDA]{LFU With Dynamic Aging (LFUDA)} \label{subsec:lfuda}
 
-\subsection[MQ]{Multi Queue (MQ)} \label{subsec:mq}
+    
 
-\subsection[ARC]{Adaptive Replacement Cache (ARC)} \label{subsec:arc}
+%\subsection[2Q]{Two Queue (2Q)} \label{subsec:2q}
 
-\subsection[CAR]{Clock With Adaptive Replacement (CAR)} \label{subsec:car}
+%\subsection[MQ]{Multi Queue (MQ)} \label{subsec:mq}
 
-\subsubsection[CART]{CAR With Temporal Filtering (CART)} \label{subsubsec:cart}
+%\subsection[ARC]{Adaptive Replacement Cache (ARC)} \label{subsec:arc}
 
-\subsection[LIRS]{Low Inter-Reference Recency Set (LIRS)} \label{subsec:lirs}
+%\subsection[CAR]{Clock With Adaptive Replacement (CAR)} \label{subsec:car}
 
-\subsection{CLOCK-Pro} \label{subsec:clock-pro}
+%\subsubsection[CART]{CAR With Temporal Filtering (CART)} \label{subsubsec:cart}
+
+%\subsection[LIRS]{Low Inter-Reference Recency Set (LIRS)} \label{subsec:lirs}
+
+%\subsection{CLOCK-Pro} \label{subsec:clock-pro}
 
 \subsection[LeanStore]{LeanStore Replacement} \label{subsec:leanstore}
 
-\section[Performance Evaluation]{Performance Evaluation} \label{sec:page_evictioners_performance_evaluation}
+    
 
-\subsection[System Configuration]{System Configuration} \label{subsec:page_evictioners_system_configuration}
+\section{Performance Evaluation} \label{sec:page_evictioners_performance_evaluation}
 
-\subsection[Benchmark]{Benchmark} \label{subsec:page_evictioners_benchmark}
+    
 
-\subsection[Results]{Results} \label{subsec:page_evictioners_results}
+\subsection{System Configuration} \label{subsec:page_evictioners_system_configuration}
 
-\subsection[Analysis]{Analysis} \label{subsec:page_evictioners_analysis}
+    
+
+\subsection{Benchmark} \label{subsec:page_evictioners_benchmark}
+
+    
+
+\subsection[Limitations]{Limitations of this Performance Evaluation}
+
+    % only B-tree, only TPC-C workload, no hints from higher layers etc.
+
+\subsection{Results} \label{subsec:page_evictioners_results}
+
+    
+
+\subsection{Analysis} \label{subsec:page_evictioners_analysis}
+
+    
 
 \section{Conclusion} \label{sec:page_evictioners_outro}
+
+    
