@@ -53,6 +53,7 @@
 \PassOptionsToPackage{toc = bib}{biblatex}   % fixes toc = bib when using BibLaTex instead of BibTeX
 \KOMAoptions{toc = graduated}                % makes the table of contents hierarchic
 \KOMAoptions{toc = indenttextentries}        % indents unnumbered entries
+\KOMAoptions{headings=optiontotoc}           % select the usage of the short title of a disposition
 
 % Settings regarding the headers and footers:
 \KOMAoptions{headlines = 1.25}        % the height of the header in number of lines (increase e.g. for multiline headers)
@@ -72,7 +73,7 @@
 \KOMAoptions{open = any}                         % select the page (any, left, right) to open a new chapter in two-sided documents
 \KOMAoptions{parskip = false}                    % toggle between first line indent and paragraph distance (can be further specified)
 \KOMAoptions{headings = big}                     % select the font size of the headings of the different structure levels
-\KOMAoptions{headings = optiontohead}            % select the usage of the short title of a disposition
+%\KOMAoptions{headings = optiontohead}           % select the usage of the short title of a disposition
 \setcounter{secnumdepth}{\subsubsectionnumdepth} % set the lowest structure level with a numbering
 \KOMAoptions{numbers = autoendperiod}            % enable/disable the usage of periods after the numbering of a chapter (auto mode enables option when there are numbers that aren't arabic numbers)
 \KOMAoptions{chapterprefix = false}              % enable/disable the usage of ``Chapter n\\ \chaptername'' instead of ``n \chaptername''
