@@ -207,10 +207,13 @@
 \usepackage{ulem}          % allows many kinds of text decorations like underlines or strikes
 \robustify\uline           % allows the usage of \uline together with typewriter fonts
 \normalem                  % \emph uses italic fonts to emphasize text
+\usepackage{makecell}      % eases creation of multilined cells in tabular environments
 
 \usepackage{listings}      % allows the printing of source code
 % for a definition of the parameter 'matchrangestart' see ./tex/command_definitions.tex
 \usepackage{algpseudocode} % allows the creation of pseudocode listings
+\usepackage{enumitem}      % gives more control over itemize, enumerate and description environments
+\setlist{nosep}            % removes the separation (additional to \baselineskip) between items in itemize, enumerate and description environments
 
 \nottoggle{bwmode}{
     \definecolor{keyword}{RGB}{5,0,111}
