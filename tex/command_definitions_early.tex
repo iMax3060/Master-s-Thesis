@@ -298,3 +298,29 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% begindefinition
 \newcommand{\ignore}[1]{}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% enddefinition
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Allows the labeling of items of a description using:
+% \begin{labeleddescription}
+%     \item[label] \label{identifier} text
+% \end{labeleddescription}
+% \ref{identifier}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% begindefinition
+\makeatletter
+\newcommand\my@saved@item{}
+\newcommand\mydescriptionitem{}
+\def\mydescriptionitem[#1]{%
+    \my@saved@item[{\csname phantomsection\endcsname#1}]%
+    \def\@currentlabel{\unexpanded{\unexpanded{#1}}}%
+}%
+\newenvironment{labeleddescription}%
+{%
+    \let\my@saved@item=\@item
+    \let\@item=\mydescriptionitem
+    \description
+}%
+{\csname enddescription\endcsname}
+\makeatother
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% enddefinition
