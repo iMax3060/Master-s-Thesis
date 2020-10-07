@@ -1,13 +1,32 @@
-\newenvironment{myabstract}
-    {
-        \KOMAoptions{DIV = last}
-        \begin{abstract}
-            \thispagestyle{plain}
-            \small
-    }{
-        \end{abstract}
-    }
+\newenvironment{myabstract}{
+    \KOMAoptions{DIV = last}
+    \begin{abstract}
+        \thispagestyle{plain}
+        \small
+}{
+    \end{abstract}
+}
+
+\begin{otherlanguage}{ngerman}
+    \begin{myabstract}
+        In der Vergangenheit war die Reduzierung der Plattenzugriffe für die Leistung eines DBVS entscheidender als die Reduzierung der für eine bestimmte Aufgabe erforderlichen CPU-Zyklen. Es war wichtig, die CPU mit der Bearbeitung anderer Transaktionen auszulasten, während eine Transaktion darauf warten musste, dass benötigte Daten von der Festplatte geladen werden. Mit stetig wachsendem Arbeitsspeicher in modernen Servern und der verbesserten Leistung von NVRAM-Produkten wurden Hauptspeicher-DBS mehr und mehr zur Norm. In diesen Systemen sind Optimierungen für HDD- --- oder heute SSD- --- Zugriffe für die reguläre Transaktionsverarbeitung viel weniger wichtig.
+
+        Ohne diesen leistungseinschränkenden Faktor wurde die Minimierung der zur Ausführung einer Transaktion erforderlichen CPU-Zyklen zum Schlüssel für die Leistungsmaximierung von DBS. Um die Motivation für ein komplettes Redesign von DBVS zu liefern, identifizierten Harizopoulos et al. in \cite{Harizopoulos:2008} verschiedene Komponenten des \textit{Shore Storage Manager}, die die überwiegende Zahl der CPU-Zyklen während der Ausführung einiger Transaktionen des \textit{TPC-C} Benchmarks in Anspruch nehmen. Sie kamen zu dem Schluss, dass die CPU auf modernen Systemen nur in einem sehr kleinen Teil --- \SIrange{1}{2}{\percent} --- der Zeit nützliche Arbeit leistet. In Kapitel \ref{ch:looking_glass} dieser Arbeit wiederhole ich deren Messungen mit einer anderen Methodik an einem modernisierten Nachfolger des \textit{Shore Storage Manager}.
+
+        Allerdings ist die Ausführung von OLTP-Anwendungen auf schwacher Hardware noch immer im privaten und kommerziellen Bereich zu finden, und es werden auch dort stetig neue Arbeitslasten hinzugefügt, so dass DBVS-Optimierungen, die sich auf die Minimierung des HDD- oder SSD-Zugriffs konzentrieren, immer noch Sinn ergeben. Aus diesem Grund werden in Kapitel \ref{ch:page_evictioners} viele gängige Seitenersetzungsalgorithmen untersucht, die im Laufe der Geschichte vorgeschlagen wurden. Es reicht jedoch nicht aus, in einer Leistungsbewertung dieser Seitenersetzungsalgorithmen nur die Reduzierung von SSD-Zugriffen zu betrachten, da einige von ihnen das Potenzial haben, selbst zu einem Flaschenhals für ein DBS zu werden. Aus diesem Grund wurden alle diese Algorithmen für ein echtes DBVS implementiert und im Hinblick auf Fehlseitenrate und Transaktionsdurchsatz bei \textit{TPC-C} verglichen.
+        
+        Für meine Bachelorarbeit hatte ich die Pointer Swizzling für den Pufferpool, wie von Graefe et al. in \cite{Graefe:2014} vorgeschlagen, bereits neu evaluiert. Aufgrund von Stabilitätsproblemen des verwendeten DBMS-Prototypen waren die Messungen jedoch kaum aussagekräftig. Eine Neuevaluierung dieser Technik ist im Abschnitt \ref{subsec:looking_glass_swizzling} zu finden.
+    \end{myabstract}
+\end{otherlanguage}
 
 \begin{myabstract}
+    
+    Traditionally, reducing disk accesses has been more decisive to the performance of an OLTP system than reducing the number of CPU cycles needed for a given workload. It was important to keep the CPU busy---executing other transactions---while transactions had to wait for data to be fetched from hard disk. With the ever-increasing amount of available RAM in modern servers and the improved performance of NVRAM products, in-memory OLTP systems became more and more the norm. In these systems, optimizations for disk---or today SSD---accesses are much less important for regular transaction processing.
+    
+    Without this performance constraining factor, minimizing the CPU cycles required to execute a transaction became the key to maximizing OLTP system throughput. To provide motivation for a complete redesign of DBMSs for these new conditions, Harizopoulos et al. identified various components of the \textit{Shore Storage Manager} that take the vast majority of CPU cycles during the execution of some transactions of the \textit{TPC-C} benchmark \cite{Harizopoulos:2008}. They concluded that the CPU does useful work on these modern systems only in a very small portion---\SIrange{1}{2}{\percent}---of the time. In Chapter \ref{ch:looking_glass} of this thesis, I repeat their measurements using a different technique on a modernized successor of the \textit{Shore Storage Manager}.
+    
+    However, OLTP systems on poor hardware are still found in private and commercial applications, and they continue to be stressed with ever new workloads, so there are still opportunities for DBMS optimizations that focus on minimizing HDD or SSD access. For this reason, Chapter \ref{ch:page_evictioners} assesses many common page replacement algorithms that have been proposed throughout history. However, it is insufficient to address only the reduction of SSD accesses in a performance evaluation of these page replacement algorithms, as some of them have the potential to become a bottleneck for a DBS. For this reason, all these algorithms have been implemented for a real DBMS and compared in terms of hit rate and \textit{TPC-C} transaction throughput.
+    
+    For my Bachelor's thesis I re-evaluated the Pointer Swizzling technique for the buffer pool that Graefe et al. proposed in \cite{Graefe:2014}. However, due to stability problems of the DBMS prototype used, the measurements were hardly meaningful. A re-re-evaluation of this technique can be found in the Section \ref{subsec:looking_glass_swizzling}.
     
 \end{myabstract}

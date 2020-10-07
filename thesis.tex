@@ -1,5 +1,27 @@
 \documentclass[final]{scrreprt} % setting of the document class; only the KOMA-Script classes are allowed here as this document uses many of those features
 
+
+\newcommand{\university}{Technische Universität Kaiserslautern}  % the name of the university
+\newcommand{\universityurl}{https://www.uni-kl.de/}
+\newcommand{\universitylogo}{\scalebox{2}{\TULogoWithText}}      % the logo of the university (with name)
+\newcommand{\faculty}{Department of Computer Science}            % the faculty
+\newcommand{\facultyurl}{https://cs.uni-kl.de/}
+\newcommand{\chair}{Heterogenous Information Systems Group}      % the chair
+\newcommand{\chairurl}{http://wwwlgis.informatik.uni-kl.de/cms/his/}
+\newcommand{\student}{Max Fabian Gilbert}                        % the student's name
+\newcommand{\email}{m\_gilbert13@cs.uni-kl.de}                   % the student's email address
+\newcommand{\cleanemail}{m_gilbert13@cs.uni-kl.de}
+\newcommand{\doctype}{Master's Thesis}                           % the type of the thesis (e.g. Bachelor's Thesis)
+\newcommand{\fullfildegree}{Master of Science}                   % the degree this thesis is part of its fullfilment
+\newcommand{\doctitle}{Bottlenecks Uncovered: A Component-Wise Breakdown of the Runtime of an OLTP System} % the title of the work
+\newcommand{\issuedate}{\specificdate{2020}{2}{1}}               % the issue date of the thesis
+\newcommand{\releasedate}{\specificdate{2020}{9}{14}}            % the release date of the thesis
+\newcommand{\city}{Kaiserslautern}                               % the city of submission
+\newcommand{\advisor}{\begin{de}Dr.-Ing. Caetano Sauer\end{de}}    % the advisor of the thesis	
+\newcommand{\reviewerfirst}{\begin{de}Prof. Dr.-Ing. Stefan Deßloch\end{de}}          % the first reviewer of the thesis
+\newcommand{\reviewersecond}{\begin{de}Prof. Dr.-Ing. Dr. h. c. Theo Härder\end{de}}  % the second reviewer of the thesis
+
+
 \include{./tex/command_definitions_early}
 
 % Settings regarding the general paper format:
@@ -53,7 +75,7 @@
 \PassOptionsToPackage{toc = bib}{biblatex}   % fixes toc = bib when using BibLaTex instead of BibTeX
 \KOMAoptions{toc = graduated}                % makes the table of contents hierarchic
 \KOMAoptions{toc = indenttextentries}        % indents unnumbered entries
-\KOMAoptions{headings=optiontotoc}           % select the usage of the short title of a disposition
+\KOMAoptions{headings = optiontoheadandtoc}  % select the usage of the short title of a disposition
 
 % Settings regarding the headers and footers:
 \KOMAoptions{headlines = 1.25}        % the height of the header in number of lines (increase e.g. for multiline headers)
@@ -90,6 +112,7 @@
 }
 
 % Settings regarding the floats and captions:
+\usepackage{caption}
 \KOMAoptions{captions = figuresignature}      % select if the caption of a figure should be printed as signature or heading (to put the caption below or above the content of the figure)
 \KOMAoptions{captions = tableheading}         % select if the caption of a table should be printed as signature or heading (to put the caption below or above the content of the table)
 \KOMAoptions{captions = oneline}              % select if single-line captions should be centered
@@ -103,12 +126,16 @@
 \KOMAoptions{listof = graduated}              % select the layout of the lists of floats
 \KOMAoptions{listof = indenttextentries}      % indents unnumbered floats in the lists of floats
 \usepackage{float}                            % allows the definition of new types of floats
-\floatstyle{komaabove}                        % every definition of a new type of floats will use this style (defined by KOMA-Script: komaabove, komabelow)
+\floatstyle{komabelow}                        % every definition of a new type of floats will use this style (defined by KOMA-Script: komaabove, komabelow)
 \newfloat{code}{tbp}{code}[chapter]           % defines a new type of float ``code'' that gets numbered per chapter and that can be used with \begin{code} ... \end{code} and \listof{code}{List of Listings}
 \floatname{code}{Listing}                     % the name of the float ``code'' that is printed in the caption is ``Listing''
 \newfloat{algorithm}{tbp}{algorithm}[chapter] % defines a new type of float ``algorithm'' that gets numbered per chapter and that can be used with \begin{algorithm} ... \end{algorithm} and \listof{algorithm}{List of Algorithms}
 \floatname{algorithm}{Algorithm}              % the name of the float ``algorithm'' that is printed in the caption is ``Algorithm''
-\usepackage{caption}                          % used to split floats using \ContinuedFloat but has many more features
+\setlength{\textfloatsep}{15pt plus 1.0pt minus 2.0pt}
+\setlength{\floatsep}{10pt plus 1.0pt minus 2.0pt}
+\setlength{\intextsep}{10pt plus 1.0pt minus 2.0pt}
+\setlength{\belowcaptionskip}{0pt}
+\setlength{\abovecaptionskip}{-2pt plus 1.0pt minus 2.0pt}
 
 % Settings regarding the used languages:
 \usepackage[main = english, ngerman]{babel}   % define the used languages (has influence on different things like hyphenation, date format and figure labels)
@@ -133,6 +160,7 @@
 \usepackage[hyphens]{url}
 
 \usepackage{graphicx}                % allows including of graphics and the scaling and rotating of elements
+\usepackage{adjustbox}
 \usepackage{etoolbox}                % toolbox used by packages and classes
 \usepackage{xpatch}                  % extends the patching facility of etoolbox
 \usepackage{csquotes}                % context sensitive quotation environment e.g. used by biblatex
@@ -149,6 +177,8 @@
         ]{xcolor}                    % extended color facility
 \usepackage{blindtext}               % allows to easily add some dummy text (similar to lipsum)
 \usepackage{prelim2e}                % marks every page as being a preliminary version when this document is compiled as a draft
+\usepackage{contour}
+\contourlength{1pt}
 
 \definecolor{simpleMaroon}{HTML}{800000}
 \definecolor{simpleBrown}{HTML}{9A6324}
@@ -178,18 +208,42 @@
             style = alphabetic,    % select the style of the citation and of the bibliography
             backend = biber        % select the backend that processes the .bib file (run the selected backend instead of BibTeX)
         ]{biblatex}                % used to create the bibliography, more modern alternative to the standard BibTeX
-
 \addbibresource[datatype = bibtex]{./tex/references.bib} % loads the specified bibliography file (in BibTeX format) into BibLaTeX
 \usepackage{breakcites}                                  % multiple citations within one \cite break at the end of the line
-\usepackage[]{hyperref}                                  % allows hyperlinks within the output document (hyperfootnotes = false to make it compatible with package footmisc)
+\usepackage{hyperref}                                    % allows hyperlinks within the output document (hyperfootnotes = false to make it compatible with package footmisc)
+\nottoggle{bwmode}{
+    \hypersetup{
+        colorlinks = true,
+        linkcolor = black,
+        citecolor = black,
+        urlcolor = MidnightBlue,
+        pdftitle = {\doctitle},
+        pdfauthor = {\student}
+    }
+}{
+    \hypersetup{
+        colorlinks = true,
+        linkcolor = black,
+        citecolor = black,
+        urlcolor = black,
+        pdftitle = {\doctitle},
+        pdfauthor = {\student}
+    }
+}
+\urlstyle{same}
 \usepackage{nameref}                                     % allows the usage of the command \nameref which prints the title of the referenced label instead of its number
 
 \usepackage{tikz}                           % extremely powerful facility to create diagrams
 \usetikzlibrary{shapes.geometric, shapes.misc, shapes.callouts, shapes.multipart}  % provide several shapes besides the standard ones
 \usetikzlibrary{decorations.pathreplacing}  % allows decorated paths without having the original (undecorated) line
-\usetikzlibrary{patterns}                   % allows the usage of several patterns to fill shapes
+\usetikzlibrary{patterns, patterns.meta}    % allows the usage of several patterns to fill shapes
+\usetikzlibrary{fadings}
+\tikzfading[name = outFading, bottom color = transparent!100, top color = transparent!0]
+\tikzfading[name = inFading, bottom color = transparent!0, top color = transparent!100]
 \usetikzlibrary{positioning}                % defines additional options for placing nodes conventionally
+\usetikzlibrary{fit}
 \usetikzlibrary{calc}                       % allows extended coordinate calculation
+\usetikzlibrary{babel}
 \usetikzlibrary{spy}                        % allows the magnification of parts of a tikz diagram
 \usetikzlibrary{chains}                     % allows the creation of chains of nodes
 \usepackage{pgfplots}                       % allows the creation of plots to visualize data
@@ -212,78 +266,29 @@
 \usepackage{listings}      % allows the printing of source code
 % for a definition of the parameter 'matchrangestart' see ./tex/command_definitions.tex
 \usepackage{algpseudocode} % allows the creation of pseudocode listings
+
+\lstset{%
+    basicstyle = \small,
+    frame = shadowbox,
+    columns = fullflexible
+}
+\nottoggle{bwmode}{%
+    \lstset{%
+        backgroundcolor = \color{Cyan!20}
+    }
+}{%
+    \lstset{%
+        backgroundcolor = \color{black!15}
+    }
+}
+
 \usepackage{enumitem}      % gives more control over itemize, enumerate and description environments
 \setlist{nosep}            % removes the separation (additional to \baselineskip) between items in itemize, enumerate and description environments
+\usepackage{listofitems}
 
-\nottoggle{bwmode}{
-    \definecolor{keyword}{RGB}{5,0,111}
-    \definecolor{string}{RGB}{0,114,0}
-    \definecolor{comment}{RGB}{109,109,109}
-    \definecolor{listingsbackground}{RGB}{255, 255, 225}
-    \definecolor{listingsrulesep}{RGB}{205, 205, 205}
-    \definecolor{lsthighlight}{RGB}{217, 216, 255}       % used to highlight specific lines of a lstlisting
-    \definecolor{alert}{RGB}{244, 0, 68}
-}{
-    \definecolor{keyword}{RGB}{0,0,0}
-    \definecolor{string}{RGB}{0,0,0}
-    \definecolor{comment}{RGB}{109,109,109}
-    \definecolor{listingsbackground}{RGB}{255, 255, 255}
-    \definecolor{listingsrulesep}{RGB}{205, 205, 205}
-    \definecolor{lsthighlight}{RGB}{205, 205, 205}       % used to highlight specific lines of a lstlisting
-    \definecolor{alert}{RGB}{0, 0, 0}
-}
-
-\lstdefinestyle{basic}{
-    basicstyle = \scriptsize \ttfamily,
-    keywordstyle = \color{keyword}\bfseries,
-    stringstyle = \color{string}\bfseries,
-    commentstyle = \color{comment},
-    morecomment = [l][\color{comment}]{\#},
-    breaklines = false,
-    showlines = true,
-    matchrangestart = true,
-    numbers = left,
-    numberstyle = \tiny,
-    stepnumber = 1,
-    numberblanklines = false,
-    numbersep = 10pt,
-    framexleftmargin = 20pt,
-    frame = shadowbox,
-    backgroundcolor = \color{listingsbackground},
-    rulesepcolor = \color{listingsrulesep},
-    inputencoding = utf8
-}
-
-\lstdefinestyle{inline}{
-    basicstyle = \scriptsize \ttfamily,
-    inputencoding = utf8
-}
-
-\lstdefinestyle{tcolorbox}{
-    basicstyle = \scriptsize \ttfamily,
-    keywordstyle = \color{keyword}\bfseries,
-    stringstyle = \color{string}\bfseries,
-    commentstyle = \color{comment},
-    morecomment = [l][\color{comment}]{\#},
-    breaklines = false,
-    showlines = true,
-    matchrangestart = true,
-    numbers = left,
-    numberstyle = \scriptsize,
-    stepnumber = 1,
-    numberblanklines = false,
-    numbersep = 10pt,
-    framexleftmargin = 20pt,
-    inputencoding = utf8
-}
-
-\lstset{
-    language = [ISO]C++,
-    style = inline
-}
 
 % Select the chapters (included files) for partial compilation of drafts (better than just commenting \include commands because of .aux-files); omit .tex file-ending here and in each of the \include commands:
-\includeonly{./tex/titlepage,./tex/abstract,\ignore{}./tex/swizzling,./tex/page_evictioners,./tex/looking_glas,\ignore{}./tex/tu_logo,./tex/command_definitions_early,./tex/command_definitions_late}
+\includeonly{./tex/titlepage,./tex/declaration,./tex/abstract,\ignore{}./tex/page_evictioners,./tex/looking_glas,\ignore{}./tex/tu_logo,./tex/command_definitions_early,./tex/command_definitions_late}
 
 \include{./tex/tu_logo}
 
@@ -299,6 +304,8 @@
 
     \pagenumbering{Roman}
 
+    \include{./tex/declaration}
+
     \include{./tex/abstract}
 
     \cleardoublepage
@@ -310,8 +317,6 @@
 
     \cleardoublepage
     \pagenumbering{arabic}
-
-    \include{./tex/swizzling}
 
     \include{./tex/page_evictioners}
 
